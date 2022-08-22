@@ -48,9 +48,7 @@ protected_mode_entry:
     mov gs, ax
     mov ss, ax
 
-    cli
-    hlt
-
+    jmp entry_point
 
 ; 32-bit protected mode GDT
 align 8
@@ -74,3 +72,5 @@ pm_gdt:
 times 510-($-$$) db 0
 ; The last 2 bytes must be the Bootloader special signature
 dw 0xAA55
+
+incbin "build/sherlock.flat"

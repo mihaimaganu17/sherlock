@@ -5,6 +5,7 @@
 mod lld_undefined;
 
 use core::panic::PanicInfo;
+use core::arch::asm;
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -13,6 +14,12 @@ fn panic(info: &PanicInfo) -> ! {
 
 #[no_mangle]
 fn entry() {
-    panic!("APPLES")
+    unsafe {
+        core::ptr::write(0xb8000 as *mut u16, 0x0f45);
+        asm!(r#"
+            cli
+            hlt
+        "#);
+    }
 }
 

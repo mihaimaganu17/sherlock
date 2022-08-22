@@ -1,5 +1,6 @@
 /target
 Cargo.lock
 /bootloader/target
+/bootloader/build
 
 *.swp
