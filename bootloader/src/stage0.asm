@@ -28,7 +28,7 @@ entry:
     ; Fetch the control Register 0
     mov eax, cr0
     ; set PE(Protection Enable) bit in CR0
-    or al, 1
+    or eax, 1
     ; set the CR0 back
     mov cr0, eax
 
@@ -48,6 +48,10 @@ protected_mode_entry:
     mov gs, ax
     mov ss, ax
 
+    ; Set up a basic stack
+    mov esp, 0x7c00
+
+    ; jump into Rust
     jmp entry_point
 
 ; 32-bit protected mode GDT

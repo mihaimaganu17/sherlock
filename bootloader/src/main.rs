@@ -1,25 +1,21 @@
-#![feature(rustc_private)]
+#![feature(rustc_private, lang_items)]
 #![no_std]
 #![no_main]
 
-mod lld_undefined;
-
 use core::panic::PanicInfo;
-use core::arch::asm;
 
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
 
+
 #[no_mangle]
-fn entry() {
-    unsafe {
-        core::ptr::write(0xb8000 as *mut u16, 0x0f45);
-        asm!(r#"
-            cli
-            hlt
-        "#);
-    }
+extern fn entry() {
+    serial::init();
+
+    serial::write(b"Hello world!\n");
+
+    cpu::halt();
 }
 

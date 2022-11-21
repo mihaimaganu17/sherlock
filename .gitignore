@@ -3,5 +3,8 @@ Cargo.lock
 /bootloader/target
 /bootloader/build
 /build
+pypxe.sh
+build/
+**/target
 
 *.swp

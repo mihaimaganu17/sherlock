@@ -17,7 +17,7 @@ fn flatten_pe<P: AsRef<Path>>(filename: P) -> Option<(u32, u32, Vec<u8>)> {
     let mut image_start = None;
     let mut image_end = None;
 
-    pe.sections(|base, size, raw| {
+    pe.sections(|base, size, _raw| {
         let end = base.checked_add(size.checked_sub(1)?.into())?;
 
         if image_start.is_none() {
@@ -40,7 +40,12 @@ fn flatten_pe<P: AsRef<Path>>(filename: P) -> Option<(u32, u32, Vec<u8>)> {
 
     pe.sections(|base, size, raw| {
         let flat_off: usize = (base - image_start).try_into().ok()?;
-        flattened[flat_off..flat_off.checked_add(size.try_into().ok()?)?].copy_from_slice(raw);
+        let size: usize = size.try_into().ok()?;
+
+        // Compute the number of bytes to initialize
+        let to_copy = std::cmp::min(size, raw.len());
+
+        flattened[flat_off..flat_off.checked_add(to_copy)?].copy_from_slice(raw);
         Some(())
     })?;
 
@@ -55,10 +60,11 @@ fn flatten_pe<P: AsRef<Path>>(filename: P) -> Option<(u32, u32, Vec<u8>)> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a build folder, if it does not exist
     let build_dir = Path::new("build");
-    let bootloader_build_dir = build_dir.clone().join("bootloader").canonicalize()?;
+    let bootloader_build_dir = build_dir.clone().join("bootloader").canonicalize().expect("Nope");
 
-    std::fs::create_dir_all(&build_dir)?;
-    std::fs::create_dir_all(&bootloader_build_dir)?;
+    std::fs::create_dir_all(&build_dir).expect("Failed to create build directory");
+    std::fs::create_dir_all(&bootloader_build_dir).expect("Failed to create boot directory");
+
 
     // Create the boot file name
     let boot_file = build_dir.clone().join("sherlock.boot");
@@ -85,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Write out the flattened bootloader image
-    std::fs::write(Path::new("build").join("sherlock.flat"), image)?;
+    std::fs::write(Path::new("build").join("sherlock.flat"), image).expect("Failed to write flat");
 
 
     // Build the stage0
@@ -109,8 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Bootloader size exceeds allowed PXE limit".into());
     }
 
-    std::fs::copy(boot_file, "/home/m3m0ry/configs/tftp/sherlock.boot");
-
+    //std::fs::copy(boot_file, "/home/m3m0ry/fun/sherlock/build/sherlock.boot")?;
 
     Ok(())
 }
