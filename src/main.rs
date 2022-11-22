@@ -6,6 +6,8 @@ use std::{
 
 use parse_pe::PeParser;
 
+// Base address to the Rust bootloader
+const BOOTLOADER_BASE: u32 = 0x7e00;
 const MAX_BOOTLOADER_SIZE: u64 = 32 * 1024;
 
 /// Create a flattened PE image
@@ -69,6 +71,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create the boot file name
     let boot_file = build_dir.clone().join("sherlock.boot");
 
+    // Build the assembly routines for the bootloader
+    if !Command::new("nasm")
+        .args(&[
+            "-f",
+            "win32",
+            &format!("-DPROGRAM_BASE={:#x}", BOOTLOADER_BASE),
+            Path::new("bootloader").join("src").join("asm_routines.asm").to_str().unwrap(),
+            "-o",
+            Path::new("build").join("bootloader").join("asm_routines.obj").to_str().unwrap()
+        ])
+        .status()?
+        .success()
+    {
+        return Err("Failed to build bootloader assembly routines".into());
+    }
+
     let boot_build_cmd = Command::new("cargo")
         .current_dir("bootloader")
         .args(&[
@@ -86,8 +104,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("Failed to flatten bootloader PE image")?;
 
     // Make sure the PE gets loaded to where we expect
-    if base != 0x7e00 {
-        return Err("Base address for bootloader did not match 0x7e00".into());
+    if base != BOOTLOADER_BASE {
+        return Err("Base address for bootloader did not match expected".into());
     }
 
     // Write out the flattened bootloader image
