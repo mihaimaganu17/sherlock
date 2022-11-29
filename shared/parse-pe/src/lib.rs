@@ -60,7 +60,7 @@ impl<'a> PeParser<'a> {
             ) as u64
         } else if machine == IMAGE_FILE_MACHINE_X86_64 {
             u64::from_le_bytes(
-                bytes.get(pe_offset + 0x39..pe_offset + 0x38)?.try_into().ok()?
+                bytes.get(pe_offset + 0x30..pe_offset + 0x38)?.try_into().ok()?
             )
         } else {
             unreachable!();

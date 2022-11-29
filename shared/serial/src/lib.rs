@@ -1,8 +1,8 @@
 //! A basic 8250A serial driver for x86
+#![feature(rustc_private)]
 #![no_std]
 
 use lockcell::LockCell;
-use cpu::out8;
 
 /// A collection of 4 8250A serial ports, as seen on IBM PC systems 
 /// There are the 4 serail ports which are identified by the BIOS, and thus it is limited to just
@@ -38,12 +38,13 @@ impl SerialPort {
 
             unsafe {
                 // Initialize the serial port a known state
-                out8(port + 1, 0x00); // Disable all interrupts
-                out8(port + 3, 0x80); // Enable DLAB
-                out8(port + 0, 0x01); // Set divisor to 1 (lo byte), 115200 baud
-                out8(port + 1, 0x00); // Set Hi byte divisor
-                out8(port + 3, 0x03); // 8 bits, no parity, one stop bit
-                out8(port + 4, 0x03); // RTS/DSR set
+                cpu::out8(port + 1, 0x00); // Disable all interrupts
+                cpu::out8(port + 3, 0x80); // Enable DLAB
+                cpu::out8(port + 0, 0x01); // Set divisor to 1 (lo byte), 115200 baud
+                cpu::out8(port + 1, 0x00); // Set Hi byte divisor
+                cpu::out8(port + 3, 0x03); // 8 bits, no parity, one stop bit
+                cpu::out8(port + 4, 0x0B); // RTS/DSR set
+
             }
 
             // Identify that we found an initialized a serial port
@@ -58,13 +59,13 @@ impl SerialPort {
         if byte == b'\n' { self.write_byte(port, b'\r'); }
 
         // Check if this COM port exists
-        if let Some(Some(port)) = self.devices.get(port) {
+        if let Some(&Some(port)) = self.devices.get(port) {
             unsafe {
                 // Wait for the output buffer to be ready
                 while (cpu::in8(port + 5) & 0x20) == 0 {}
 
                 // Write the bytes
-                cpu::out8(*port, byte);
+                cpu::out8(port, byte);
             }
         }
     }
@@ -88,6 +89,7 @@ impl core::fmt::Write for SerialWriter {
         Ok(())
     }
 }
+
 
 // Print macro implementation
 #[macro_export]

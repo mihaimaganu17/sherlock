@@ -1,8 +1,8 @@
 //! Inner mutability on shared variables with spinlocks
 #![no_std]
 
-use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
+use core::cell::UnsafeCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// A spinlock guarded variable
@@ -114,7 +114,7 @@ mod test {
             fn drop(&mut self) { panic!("Got drop"); }
         }
 
-        let var = LockCell::new(Foo);
+        let _var = LockCell::new(Foo);
         let _lk = var.lock();
     }
 }

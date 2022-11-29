@@ -90,7 +90,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let boot_build_cmd = Command::new("cargo")
         .current_dir("bootloader")
         .args(&[
-            "build", "--release", "--target-dir",
+            "build",
+            "--release",
+            "--target",
+            "i586-pc-windows-msvc",
+            "--target-dir",
             bootloader_build_dir.to_str().unwrap()
         ]).status()?;
 
@@ -129,6 +133,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Check bootloader size is within bounds
     let bl_size = boot_file.metadata()?.len();
+    print!("Current bootloader size is {} of {} bytes [{:8.4} %]\n",
+                bl_size, MAX_BOOTLOADER_SIZE,
+                        bl_size as f64 / MAX_BOOTLOADER_SIZE as f64 * 100.);
     if bl_size > MAX_BOOTLOADER_SIZE {
         return Err("Bootloader size exceeds allowed PXE limit".into());
     }

@@ -28,7 +28,7 @@ entry:
     ; Fetch the control Register 0
     mov eax, cr0
     ; set PE(Protection Enable) bit in CR0
-    or eax, 1
+    or eax, (1 << 0)
     ; set the CR0 back
     mov cr0, eax
 
@@ -52,7 +52,7 @@ protected_mode_entry:
     mov esp, 0x7c00
 
     ; jump into Rust
-    jmp entry_point
+    call entry_point
 
 ; 32-bit protected mode GDT
 align 8
@@ -75,6 +75,7 @@ pm_gdt:
 ; Fill sector with 0's
 times 510-($-$$) db 0
 ; The last 2 bytes must be the Bootloader special signature
-dw 0xAA55
+dw 0xaa55
 
 incbin "build/sherlock.flat"
+
