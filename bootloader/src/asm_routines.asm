@@ -101,9 +101,6 @@ _invoke_realmode:
     iretw
 
 .retpoint:
-    ; Clear interrupts for sketchy bioses
-    cli
-
     ; Save off all registers
     push eax
     push ecx

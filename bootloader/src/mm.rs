@@ -7,6 +7,10 @@ use rangeset::{RangeSet, Range};
 /// removed.
 static PMEM_FREE: LockCell<Option<RangeSet>> = LockCell::new(None);
 
+/// Global allocator
+#[global_allocator]
+static GLOBAL_ALLOCATOR: GlobalAllocator = GlobalAllocator;
+
 /// The global allocator for the bootloader, this just uses physical memory as a backing and does
 /// not handle any fancy things like fragmentation.
 struct GlobalAllocator;
@@ -40,10 +44,6 @@ fn alloc_error(_: core::alloc::Layout) -> ! {
     panic!("Out of memory");
 }
 
-/// Global allocator
-#[global_allocator]
-static GLOBAL_ALLOCATOR: GlobalAllocator = GlobalAllocator;
-
 /// Initialize the physical memory manager. Here we get the memory map from the BIOS via E820 and
 /// put it into a `RangeSet` for tracking and allocation. We also subtract off the first 1 MiB of
 /// memory to prevent BIOS data structures from being overwritten.
@@ -59,7 +59,7 @@ pub fn init() {
     // memory that is marked as free. The second pass we remove all ranges that are not
     // marked as free. This sanitizes the BIOS memory map, and makes sure that any memory
     // marked both free and non-free, is not marked free at all.
-    for add_free_mem in &[true, false] {
+    for &add_free_mem in &[true, false] {
         // Allocate a register state to use when doing the E820 call
         let mut regs = RegisterState::default();
 
@@ -93,8 +93,11 @@ pub fn init() {
             }
 
             // If the entry is free, mark the memory as free
-            if *add_free_mem && entry.typ == 1 && entry.size > 0 {
-                free_memory.insert(Range { start: entry.base, end: entry.base + entry.size - 1 });
+            if add_free_mem && entry.typ == 1 && entry.size > 0 {
+                free_memory.insert(Range {
+                    start: entry.base,
+                    end: entry.base.checked_add(entry.size - 1).unwrap(),
+                });
             } else if !add_free_mem && entry.typ != 1 && entry.size > 0 {
                 free_memory.remove(Range {
                     start: entry.base,
@@ -112,7 +115,7 @@ pub fn init() {
     // Remove the IVT and BDA being marked as free so we do not overwrite them
     free_memory.remove(Range {
         start: 0,
-        end: 0x1024 * 0x1024 - 1,
+        end: 1024 * 1024 - 1,
     });
 
     *pmem = Some(free_memory);

@@ -1,30 +1,32 @@
-#![feature(rustc_private, panic_info_message, alloc_error_handler, lang_items)]
+#![feature(panic_info_message, alloc_error_handler, lang_items)]
 #![no_std]
 #![no_main]
 
 extern crate alloc;
+extern crate core_reqs;
 
-mod lld_undefined;
 mod realmode;
 mod mm;
 mod panic;
+mod pxe;
 
-use serial::print;
-
-#[no_mangle]
-pub extern "C" fn __CxxFrameHandler3() {}
+use parse_pe::PeParser;
 
 #[no_mangle]
 extern fn entry() -> !{
     serial::init();
     mm::init();
 
-    let mut map = alloc::collections::BTreeMap::new();
-    map.insert(5u8, 50);
-    map.insert(8u8, 50000);
-    map.insert(39u8, 5);
+    // Download the kernel
+    let kernel = pxe::download("sherlock.kern").unwrap();
 
-    print!("{:?}\n", map);
+    // Parse the kernel PE
+    let pe = PeParser::parse(&kernel).expect("Failed to parse PE");
+
+    pe.sections(|vaddr, vsize, raw, _, _, _| {
+        serial::print!("{:x?} {:x?}\n", vaddr as usize, vsize as usize);
+        Some(())
+    });
 
     cpu::halt();
 }

@@ -1,3 +1,6 @@
+#![feature(rustc_private)]
+#![no_std]
+
 extern crate compiler_builtins;
 
 /// libc `memcpy` implementation in Rust
@@ -25,6 +28,9 @@ pub unsafe extern fn memset(s: *mut u8, c: i32, n: usize) -> *mut u8 {
 pub unsafe extern fn memcmp(s1: *const u8, s2: *const u8, n: usize) -> i32 {
     compiler_builtins::mem::memcmp(s1, s2, n)
 }
+
+#[no_mangle]
+pub extern "C" fn __CxxFrameHandler3() {}
 
 // ---------------------------------------------------------------------------
 // Microsoft specific intrinsics

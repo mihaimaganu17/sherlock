@@ -5,6 +5,10 @@ use core::convert::TryInto;
 const IMAGE_FILE_MACHINE_I386: u16 = 0x014c;
 const IMAGE_FILE_MACHINE_X86_64: u16 = 0x8664;
 
+const IMAGE_SCN_MEM_EXECUTE: u32 = 0x2000_0000;
+const IMAGE_SCN_MEM_READ: u32 = 0x4000_0000;
+const IMAGE_SCN_MEM_WRITE: u32 = 0x8000_0000;
+
 pub struct PeParser<'a> {
     bytes: &'a [u8],
     image_base: u64,
@@ -90,24 +94,35 @@ impl<'a> PeParser<'a> {
     }
 
     /// Invoke a closue with the format
-    /// (virtual_address, virtual_size, raw_bytes) for each section in the PE file
-    pub fn sections<F: FnMut(u64, u32, &[u8]) -> Option<()>>(&self, mut func: F) -> Option<()> {
+    /// (virtual_address, virtual_size, raw_bytes, read, write, execture) for each section in the
+    /// PE file
+    pub fn sections<F: FnMut(u64, u32, &[u8], bool, bool, bool) -> Option<()>>(
+        &self,
+        mut func: F
+    ) -> Option<()> {
         let bytes = self.bytes;
 
         for section in 0..self.num_sections {
             let off = self.section_off + section * 0x28;
 
+            // Get the virtual raw sizes and offsets
             let virt_size = u32::from_le_bytes(bytes[off + 0x8..off + 0xc].try_into().ok()?);
             let virt_addr = u32::from_le_bytes(bytes[off + 0xc..off + 0x10].try_into().ok()?);
             let raw_size = u32::from_le_bytes(bytes[off + 0x10..off + 0x14].try_into().ok()?).try_into().ok()?;
             let raw_off: usize = u32::from_le_bytes(bytes[off + 0x14..off + 0x18].try_into().ok()?).try_into().ok()?;
+
+            // Get the section characteristics
+            let characteristics: u32 = u32::from_le_bytes(bytes[off + 0x24..off + 0x28].try_into().ok()?);
 
             let raw_size: usize = core::cmp::min(raw_size, virt_size as usize).try_into().ok()?;
 
             func(
                 self.image_base.checked_add(virt_addr as u64)?,
                 virt_size,
-                bytes.get(raw_off..raw_off.checked_add(raw_size)?)?
+                bytes.get(raw_off..raw_off.checked_add(raw_size)?)?,
+                (characteristics & IMAGE_SCN_MEM_READ) != 0,
+                (characteristics & IMAGE_SCN_MEM_WRITE) != 0,
+                (characteristics & IMAGE_SCN_MEM_EXECUTE) != 0,
             )?;
         }
 

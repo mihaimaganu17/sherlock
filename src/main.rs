@@ -19,7 +19,7 @@ fn flatten_pe<P: AsRef<Path>>(filename: P) -> Option<(u32, u32, Vec<u8>)> {
     let mut image_start = None;
     let mut image_end = None;
 
-    pe.sections(|base, size, _raw| {
+    pe.sections(|base, size, _raw, _, _, _| {
         let end = base.checked_add(size.checked_sub(1)?.into())?;
 
         if image_start.is_none() {
@@ -40,7 +40,7 @@ fn flatten_pe<P: AsRef<Path>>(filename: P) -> Option<(u32, u32, Vec<u8>)> {
     // Allocate a zeroed image
     let mut flattened = std::vec![0u8; image_size];
 
-    pe.sections(|base, size, raw| {
+    pe.sections(|base, size, raw, _, _, _| {
         let flat_off: usize = (base - image_start).try_into().ok()?;
         let size: usize = size.try_into().ok()?;
 
@@ -66,6 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     std::fs::create_dir_all(&build_dir).expect("Failed to create build directory");
     std::fs::create_dir_all(&bootloader_build_dir).expect("Failed to create boot directory");
+    std::fs::create_dir_all("build/kernel").expect("Failed to create kernel directory");
 
 
     // Create the boot file name
@@ -140,7 +141,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("Bootloader size exceeds allowed PXE limit".into());
     }
 
+    // Build the kernel
+    let kernel_build_dir = Path::new("build").join("kernel").canonicalize()?;
+    let kernel_exe = kernel_build_dir.join("x86_64-pc-windows-msvc")
+        .join("release").join("kernel.exe");
+
+    if !Command::new("cargo")
+        .current_dir("kernel")
+        .args(&[
+            "build",
+            "--release",
+            "--target",
+            "x86_64-pc-windows-msvc",
+            "--target-dir",
+            kernel_build_dir.to_str().unwrap()
+        ]).status()?.success() {
+       return Err("Failed to kernel".into()); 
+    }
+
     //std::fs::copy(boot_file, "/home/m3m0ry/fun/sherlock/build/sherlock.boot")?;
+    std::fs::copy(kernel_exe, Path::new("build").join("sherlock.kern"))?;
 
     Ok(())
 }

@@ -168,7 +168,7 @@ impl RangeSet {
 
             let prev_size = allocation.map(|(base, end, _)| end - base);
 
-            if allocation.is_none() || prev_size? > end -base {
+            if allocation.is_none() || prev_size.unwrap() > end -base {
             // Allocation successful
                 allocation = Some((base, end, (base + align_fix) as usize));
             }
