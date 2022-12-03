@@ -303,3 +303,98 @@ pmgdt_base:
 pmgdt:
     dw (pmgdt - pmgdt_base) - 1
     dd pmgdt_base
+
+; 64-bit long mode GDT
+
+align 8
+lmgdt_base:
+    dq 0x0000000000000000 ; Null descriptor
+    dq 0x00209A0000000000 ; 64-bit, present, code
+    dq 0x0000920000000000 ; Present, data r/w
+
+lmgdt:
+    dw (lmgdt - lmgdt_base) - 1
+    dd lmgdt_base
+    dd 0
+
+[bits 32]
+global _enter64
+_enter64:
+    ; qword [esp + 0x04] - Entry
+    ; qword [esp + 0x0c] - Stack
+    ; qword [esp + 0x14] - Param
+    ; qword [esp + 0x1c] - New cr3
+
+    ; Get the parameters passed in to this function
+    mov esi, [esp + 0x1c] ; New cr3
+
+    ; Set up CR3
+    mov cr3, esi
+
+    ; Set NXE (NX enable) and LME (long mode enable)
+    mov edx, 0
+    mov eax, 0x00000900
+    mov ecx, 0xc0000080
+    wrmsr
+
+    ; Enable SSE
+    xor eax, eax
+    or eax, (1 << 9) ; OSFXSR
+    or eax, (1 << 10) ; OSXMMEXCPT
+    or eax, (1 << 5) ; PAE
+    or eax, (1 << 3) ; DE
+    mov cr4, eax
+
+    ; Normalize the cr0
+    xor eax, eax
+    and eax, ~(1 << 2) ; Clear emulation flag
+    or eax, (1 << 0) ; Protected mode enable
+    or eax, (1 << 1) ; Monitor co-processor
+    or eax, (1 << 16) ; Write protect
+    or eax, (1 << 31) ; Paging enable
+    mov cr0, eax
+
+    ; Load the 64-bit mode GDT
+    lgdt [lmgdt]
+
+    ; Long jump to enable long mode!
+    jmp 0x0008:lm_entry
+
+[bits 64]
+lm_entry: 
+    ; Set all selectors to 64-bit data segments
+    mov ax, 0x10
+    mov es, ax
+    mov ds, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    ; Enable OSXSAVE
+    ;mov rax, cr4
+    ;or rax, 1 << 18
+    ;mov cr4, rax
+
+    ; Enable AVX512
+    ;xor ecx, ecx
+    ;xor edx, edx
+    ;mov eax, (7 << 5) | 7
+    ;xsetbv
+
+    mov rdi, qword [rsp + 0x4] ; Entry point
+    mov rbp, qword [rsp + 0xc] ; Stack
+
+    sub rbp, 0x28   ; MSFT 64-bit calling convention requires 0x20 homing space
+                    ; We also need 8 bytes for the fake `return address` since we iret! rather than
+                    ; call
+
+    ; Parameter
+    mov rcx, qword [esp + 0x14]
+
+    ; Set up a long jump via iretq to jump to long mode. (interrupt frame)
+    push qword 0x0010   ; ss
+    push qword rbp      ; rsp
+    pushfq              ; rflags
+    push qword 0x0008   ; cs
+    push qword rdi      ; rip
+    iretq

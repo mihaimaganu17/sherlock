@@ -9,6 +9,7 @@ edition = "2021"
 core_reqs = { path = "../shared/core_reqs" }
 serial = { path = "../shared/serial" }
 cpu = { path = "../shared/cpu" }
+boot_args = { path = "../shared/boot_args" }
 
 [profile.release]
 panic = "abort"

@@ -10,6 +10,9 @@ cpu = { path = "../shared/cpu" }
 rangeset = { path = "../shared/rangeset" }
 lockcell = { path = "../shared/lockcell" }
 parse-pe= { path = "../shared/parse-pe" }
+page_table = { path = "../shared/page_table" }
+boot_args = { path = "../shared/boot_args" }
+
 
 [profile.release]
 panic = "abort"

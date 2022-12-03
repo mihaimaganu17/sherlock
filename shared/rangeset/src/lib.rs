@@ -4,6 +4,7 @@ use core::cmp;
 
 /// An inclusive range, we do not use `RangeInclusive` as it does not implement `Copy`
 #[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(C)]
 pub struct Range {
     pub start: u64,
@@ -12,6 +13,7 @@ pub struct Range {
 
 /// A set of non-overlapping inclusive `u64` ranges
 #[derive(Clone, Copy)]
+#[derive(Debug)]
 #[repr(C)]
 pub struct RangeSet {
     /// Fixed array of ranges in the set
