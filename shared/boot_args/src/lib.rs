@@ -8,11 +8,15 @@
 
 use rangeset::RangeSet;
 use lockcell::LockCell;
+use serial::SerialPort;
 
 #[repr(C)]
 pub struct BootArgs {
     /// All memory which is available for use by the kernel. This structure is potentially used at
     /// the same time by both the bootloader and the kernel.
     pub free_memory: LockCell<Option<RangeSet>>,
+
+    /// The serial driver
+    pub serial: LockCell<Option<SerialPort>>,
 }
 

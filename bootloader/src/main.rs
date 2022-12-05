@@ -6,6 +6,7 @@
 extern crate alloc;
 extern crate core_reqs;
 
+#[macro_use] mod print;
 mod realmode;
 mod mm;
 mod panic;
@@ -15,14 +16,24 @@ use boot_args::BootArgs;
 use parse_pe::PeParser;
 use page_table::{VirtAddr, PageTable, PageSize};
 use lockcell::LockCell;
+use serial::SerialPort;
 
 pub static BOOT_ARGS: BootArgs = BootArgs {
     free_memory: LockCell::new(None),
+    serial: LockCell::new(None),
 };
 
 #[no_mangle]
 extern fn entry() -> !{
-    serial::init();
+    {
+        let mut serial = BOOT_ARGS.serial.lock();
+
+        if serial.is_none() {
+            // Drive has not yet been set up, initialize the ports
+            *serial = Some(unsafe { SerialPort::new() });
+        }
+    }
+
     mm::init();
 
     let (entry_point, stack, cr3) = {
@@ -61,7 +72,7 @@ extern fn entry() -> !{
                 table.map_init(VirtAddr(vaddr), PageSize::Page4K, vsize as u64, true, true, true, 
                     Some(|off| raw.get(off as usize).copied().unwrap_or(0)))?;
             }
-            serial::print!("Created map at {:x?} for {:x?}\n", vaddr as usize, vsize as usize);
+            print!("Created map at {:x?} for {:x?}\n", vaddr as usize, vsize as usize);
             Some(())
         }).unwrap();
 

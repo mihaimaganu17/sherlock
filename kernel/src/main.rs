@@ -1,33 +1,37 @@
-#![feature(panic_info_message)]
+//! The main kernel entry point
+#![feature(alloc_error_handler, panic_info_message)]
 #![no_std]
 #![no_main]
 
 extern crate core_reqs;
+#[macro_use] mod core_locals;
+#[macro_use] mod print;
 mod panic;
 
 use boot_args::BootArgs;
-use serial::print;
+use serial::SerialPort;
 
 #[no_mangle]
-pub extern fn entry(boot_args: &BootArgs) -> ! {
-    serial::init();
+pub extern fn entry(boot_args: &'static BootArgs) -> ! {
+    // Create the serail port driver
+    let mut _serial = unsafe { SerialPort::new() };
+    // Initialize the corelocals
+    core_locals::init(boot_args);
 
-    let screen = unsafe {
-        core::slice::from_raw_parts_mut(0xb8000 as *mut u8, 80 * 25 * 2)
-    };
+    if core!().id == 0 {
+        // One-time initialization for the whole kernel and all the cores
 
-    /*
+        // Initialize the serial port
+        serial::init();
+    }
+
+    print!("{}\n", core!().id);
+
     {
         let mut pmem = boot_args.free_memory.lock();
         let pmem = pmem.as_mut().unwrap();
-        //print!("{:?}\n", pmem);
+        print!("{:?}\n", pmem);
     }
-    */
 
-    serial::print!("Apples\n");
-
-    screen[..16].copy_from_slice(b"AAAAAAAAAAAAAAAA");
-
-    screen[0] = 0x31;
     cpu::halt();
 }

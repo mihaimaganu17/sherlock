@@ -1,7 +1,6 @@
 use core::convert::TryInto;
 use core::alloc::{Layout, GlobalAlloc};
 use page_table::{PhysAddr, PhysMem};
-use lockcell::LockCell;
 use crate::realmode::{RegisterState, invoke_realmode};
 use rangeset::{RangeSet, Range};
 use crate::BOOT_ARGS;
@@ -56,7 +55,6 @@ unsafe impl GlobalAlloc for GlobalAllocator {
         pmem.as_mut().and_then(|x| {
             let end = (ptr as u64).checked_add(layout.size().checked_sub(1)? as u64)?;
             x.insert(Range { start: ptr as u64, end });
-            serial::print!("Freed {} bytes\n", layout.size());
             Some(())
         }).expect("Cannot free memory without initialized MM");
     }

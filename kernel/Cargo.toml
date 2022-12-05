@@ -10,6 +10,8 @@ core_reqs = { path = "../shared/core_reqs" }
 serial = { path = "../shared/serial" }
 cpu = { path = "../shared/cpu" }
 boot_args = { path = "../shared/boot_args" }
+page_table = { path = "../shared/page_table" }
+rangeset = { path = "../shared/rangeset" }
 
 [profile.release]
 panic = "abort"

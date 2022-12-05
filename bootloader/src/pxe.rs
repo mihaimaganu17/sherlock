@@ -1,6 +1,5 @@
 use core::convert::TryInto;
 use lockcell::LockCell;
-use serial::print;
 use alloc::vec::Vec;
 use crate::realmode::{invoke_realmode, pxecall, RegisterState};
 

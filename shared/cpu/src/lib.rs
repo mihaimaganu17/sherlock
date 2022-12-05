@@ -34,6 +34,25 @@ pub unsafe fn invlpg(addr: usize) {
     );
 }
 
+/// Write an MSR
+#[inline]
+pub unsafe fn wrmsr(msr: u32, val: u64) {
+    asm!(
+        r#"
+        wrmsr
+        "#,
+        in("ecx") msr,
+        in("edx") (val << 32) as u32,
+        in("eax") (val & 0xffff_ffff) as u32,
+    )
+}
+
+/// Set the GS base
+#[inline]
+pub unsafe fn set_gs_base(base: u64) {
+    wrmsr(0xC000_0101, base);
+}
+
 /// Disable inrettupts and halt forever
 #[inline]
 pub fn halt() -> ! {
