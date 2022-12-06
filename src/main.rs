@@ -7,7 +7,7 @@ use std::{
 use parse_pe::PeParser;
 
 // Base address to the Rust bootloader
-const BOOTLOADER_BASE: u32 = 0x7e00;
+const BOOTLOADER_BASE: u32 = 0x8100;
 const MAX_BOOTLOADER_SIZE: u64 = 32 * 1024;
 
 /// Create a flattened PE image

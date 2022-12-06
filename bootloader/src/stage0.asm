@@ -48,6 +48,13 @@ protected_mode_entry:
     mov gs, ax
     mov ss, ax
 
+.wait_for_stack:
+    pause
+    xor al, al
+    lock xchg byte [stack_avail], al
+    test al, al
+    jz .wait_for_stack
+
     ; Set up a basic stack
     mov esp, 0x7c00
 
@@ -77,5 +84,16 @@ times 510-($-$$) db 0
 ; The last 2 bytes must be the Bootloader special signature
 dw 0xaa55
 
+; Do not move this, it must stay at 0x7e00. We release the early boot stack once we get into the
+; the kernel and are using a new stack. We write directly to this location.
+stack_avail: db 1
+
+times (0x8000 - 0x7c00)-($-$$) db 0
+
+[bits 16]
+ap_entry:
+    jmp 0x0000:entry
+
+times (0x8100 - 0x7c00)-($-$$) db 0
 incbin "build/sherlock.flat"
 

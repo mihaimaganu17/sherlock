@@ -7,3 +7,4 @@ edition = "2021"
 rangeset = { path = "../rangeset" }
 lockcell = { path = "../lockcell" }
 serial = { path = "../serial" }
+page_table = { path = "../page_table" }

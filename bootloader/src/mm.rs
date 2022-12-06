@@ -71,7 +71,10 @@ fn alloc_error(_: core::alloc::Layout) -> ! {
 pub fn init() {
     let mut pmem = BOOT_ARGS.free_memory.lock();
 
-    assert!(pmem.is_none(), "Attempted to re-initialize the memory manager");
+    // If physical memory has already been initialized, just return out
+    if pmem.is_some() {
+        return;
+    }
 
     // Create a new empty `RangeSet` for tracking free physical memory
     let mut free_memory = RangeSet::new();

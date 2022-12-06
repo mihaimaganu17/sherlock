@@ -12,10 +12,12 @@ pub const PAGE_NX: u64 = 1 << 63;
 /// types it to make code clarity a bit higher. This may represent a host physical address, or a
 /// guest physical address.
 #[derive(Clone, Copy)]
+#[repr(C)]
 pub struct PhysAddr(pub u64);
 
 /// A strongly typed virtual address
 #[derive(Clone, Copy)]
+#[repr(C)]
 pub struct VirtAddr(pub u64);
 
 pub trait PhysMem {
@@ -52,31 +54,28 @@ pub enum PageSize {
 
 /// A 64-bit x86 page table. This uses 4 level paging, the `PhysAddr` is the address of the top
 /// level page table. This is effectively `cr3` with the VPID bits masked off.
-pub struct PageTable<'a, P: PhysMem> {
+#[repr(C)]
+pub struct PageTable {
     /// The physical address of the top-level page table. This is typically the value in `cr3`,
     /// without the VPID bits.
     table: PhysAddr,
-
-    /// Physical memory
-    phys_mem: &'a mut P,
 }
 
-impl<'a, P: PhysMem> PageTable<'a, P> {
+impl PageTable{
     /// Create a new emptry page table
-    pub fn new(phys_mem: &'a mut P) -> Option<PageTable<P>> {
+    pub fn new<P: PhysMem>(phys_mem: &mut P) -> Option<PageTable> {
         let table = phys_mem.alloc_phys_zeroed(Layout::from_size_align(4096, 4096).ok()?)?;
 
         Some(PageTable {
             table,
-            phys_mem,
         })
     }
+
     /// Create a new page table from an existing CR3
-    pub fn from_cr3(phys_mem: &'a mut P, cr3: u64) -> PageTable<P> {
+    pub fn from_cr3<P: PhysMem>(phys_mem: &mut P, cr3: u64) -> PageTable {
         // Return out the page table with the VPID bits masked off(Intel Manual 4-24 Vol3A)
         PageTable {
             table: PhysAddr(cr3 & !0xfff),
-            phys_mem,
         }
     }
 
@@ -90,8 +89,9 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
     ///
     /// If `init` is `Some`, it will be invoked with the current offset into the mapping and the
     /// return value from the closure will be used to initialize that byte.
-    pub unsafe fn map(
+    pub unsafe fn map<P: PhysMem>(
         &mut self,
+        phys_mem: &mut P,
         vaddr: VirtAddr,
         page_type: PageSize,
         size: u64,
@@ -99,7 +99,7 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
         write: bool,
         exec: bool,
     ) -> Option<()> {
-        self.map_init::<fn(u64) -> u8>(vaddr, page_type, size, read, write, exec, None)
+        self.map_init::<fn(u64) -> u8, P>(phys_mem, vaddr, page_type, size, read, write, exec, None)
     }
 
     /// Create a page table entry initialized to `init` at `vaddr` using `page_type` as page size.
@@ -107,8 +107,9 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
     ///
     /// If `init` is `Some`, it will be invoked with the current offset into the mapping and the
     /// return value from the closure will be used to initialize that byte.
-    pub unsafe fn map_init<F>(
+    pub unsafe fn map_init<F, P: PhysMem>(
         &mut self,
+        phys_mem: &mut P,
         vaddr: VirtAddr,
         page_type: PageSize,
         size: u64,
@@ -136,7 +137,7 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
         // Go trough each page in this mapping
         for vaddr in (vaddr.0..=end_vaddr).step_by(page_size as usize) {
             // Allocate the page
-            let page = self.phys_mem.alloc_phys(
+            let page = phys_mem.alloc_phys(
                 Layout::from_size_align(page_size as usize, page_size as usize).ok()?
             )?;
 
@@ -146,7 +147,7 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
 
             if let Some(init) = &init {
                 // Translate the page
-                let bytes = self.phys_mem.translate(page, page_size as usize)?;
+                let bytes = phys_mem.translate(page, page_size as usize)?;
                 // Get acces to the memory we just allocated
                 let sliced =
                     core::slice::from_raw_parts_mut(bytes, page_size as usize);
@@ -157,7 +158,7 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
             }
 
             // Add this mapping to the page table
-            self.map_raw(VirtAddr(vaddr), page_type, ent, true, false, false);
+            self.map_raw(phys_mem, VirtAddr(vaddr), page_type, ent, true, false, false);
         }
 
         Some(())
@@ -175,7 +176,7 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
     /// * `invlpg_on_update` - If an update of an exisiting page table entry occurs, and this is
     ///                     `true`, then an `invlp` will be executed to invalidate the TLBs for the
     ///                     virtual address.
-    pub unsafe fn map_raw(&mut self, vaddr: VirtAddr, page_type: PageSize, raw: u64, add: bool,
+    pub unsafe fn map_raw<P: PhysMem>(&mut self, phys_mem: &mut P, vaddr: VirtAddr, page_type: PageSize, raw: u64, add: bool,
         update: bool, invlpg_on_update: bool,
     ) -> Option<()> {
         // Get the raw page size in bytes
@@ -183,8 +184,8 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
         // Determine the mask of the page size
         let page_mask = page_size - 1;
 
-        // Make sure that the virtual address is aligned to the page size request
-        if (vaddr.0 & page_mask) != 0 {
+        // Make sure that the virtual address is aligned to the page size request and canonical
+        if (vaddr.0 & page_mask) != 0 || cpu::canonicalize_address(vaddr.0) != vaddr.0 {
             return None;
         }
 
@@ -218,7 +219,7 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
         for (depth, &index) in indicies.iter().enumerate() {
             // Get the physical address of the page table entry
             let ptp = PhysAddr(table.0 + index * paddr_size as u64);
-            let vad = self.phys_mem.translate(ptp, paddr_size)?;
+            let vad = phys_mem.translate(ptp, paddr_size)?;
 
             // Get the page table entry
             let mut ent = *(vad as *const u64);
@@ -235,7 +236,7 @@ impl<'a, P: PhysMem> PageTable<'a, P> {
 
                 // Allocate a new table in memory
                 let new_table =
-                    self.phys_mem.alloc_phys_zeroed(Layout::from_size_align(4096, 4096).ok()?)?;
+                    phys_mem.alloc_phys_zeroed(Layout::from_size_align(4096, 4096).ok()?)?;
 
                 // Update the entry
                 ent = new_table.0 | PAGE_USER | PAGE_WRITE | PAGE_PRESENT;

@@ -39,12 +39,12 @@ macro_rules! core {
 /// Get a reference to the current core locals
 pub fn get_core_locals() -> &'static CoreLocals {
     unsafe {
-        let mut ptr: usize;
+        let ptr: usize;
 
         // Get the first `u64` from `CoreLocals`
         core::arch::asm!(r#"mov {}, gs:[0]"#, out(reg) ptr); 
 
-        &*(ptr as *const crate::core_locals::CoreLocals)
+        &*(ptr as *const CoreLocals)
     }
 }
 
