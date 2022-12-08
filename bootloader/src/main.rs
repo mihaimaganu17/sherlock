@@ -13,17 +13,12 @@ mod panic;
 mod pxe;
 
 use core::sync::atomic::{AtomicU64, Ordering};
-use boot_args::BootArgs;
+use boot_args::{BootArgs, KERNEL_STACK_SIZE, KERNEL_STACK_PAD, PHYS_WINDOW_BASE};
 use parse_pe::PeParser;
-use page_table::{VirtAddr, PageTable, PageSize};
+use page_table::{VirtAddr, PageTable, PageSize, PAGE_PRESENT, PAGE_WRITE, PAGE_NX};
 use lockcell::LockCell;
 use serial::SerialPort;
 
-/// Size to allocate for kernel stacks
-const KERNEL_STACK_SIZE: u64 = 32 * 1024;
-
-/// Padding deadspace to add between kernel stacks
-const KERNEL_STACK_PAD: u64 = 32 * 1024;
 
 /// Global arguments shared between the kernel and the bootloader. It is critical that every
 /// structure in here is identical in shape between boot 64-bit and 32-bit representations.
@@ -31,13 +26,15 @@ pub static BOOT_ARGS: BootArgs = BootArgs {
     free_memory: LockCell::new(None),
     serial: LockCell::new(None),
     page_table: LockCell::new(None), 
+    trampoline_page_table: LockCell::new(None),
     kernel_entry: LockCell::new(None),
     stack_vaddr: AtomicU64::new(0x0000_7473_0000_0000), // "st" in ascii LE
     print_lock: LockCell::new(()),
 };
 
+/// Rust entry point for the bootloader
 #[no_mangle]
-pub extern fn entry() -> !{
+pub extern fn entry(bootloader_end: usize) -> !{
     // Initialize the serial driver
     {
         let mut serial = BOOT_ARGS.serial.lock();
@@ -46,11 +43,14 @@ pub extern fn entry() -> !{
             // Drive has not yet been set up, initialize the ports
             *serial = Some(unsafe { SerialPort::new() });
 
+            // Clear the screen
             core::mem::drop(serial);
             // Clear the screen
             for _ in 0..100 {
                 print!("\n");
             }
+            print!("Chocolate Milk bootloader initialized!\n");
+            print!("Bootloader end at {:#x}\n", bootloader_end);
         }
     }
 
@@ -77,6 +77,28 @@ pub extern fn entry() -> !{
             let mut pmem = BOOT_ARGS.free_memory.lock();
             let pmem = pmem.as_mut().expect("Whoa, physical memory not init yet");
             let mut pmem = mm::PhysicalMemory(pmem);
+
+            // Create the trampoline page table
+            let mut trampoline_table = PageTable::new(&mut pmem)
+                .expect("Failed to create trampoline page table");
+
+            for paddr in (0..bootloader_end as u64).step_by(4096) {
+                unsafe {
+                    // Create a mapping where vaddr == paddr
+                    trampoline_table
+                        .map_raw(&mut pmem, VirtAddr(paddr), PageSize::Page4K,
+                            paddr | PAGE_WRITE | PAGE_PRESENT, true, false, false
+                        )
+                        .unwrap();
+
+                    // Create a mapping where vaddr == paddr + phys_windows_base
+                    trampoline_table
+                        .map_raw(&mut pmem, VirtAddr(paddr), PageSize::Page4K,
+                            paddr | PAGE_WRITE | PAGE_PRESENT, true, false, false
+                        )
+                        .unwrap();
+                }
+            }
 
             // Create a new page table
             let mut table = PageTable::new(&mut pmem).expect("Failed to create page table");

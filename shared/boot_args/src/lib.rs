@@ -13,6 +13,17 @@ use lockcell::LockCell;
 use serial::SerialPort;
 use page_table::PageTable;
 
+/// Size to allocate for kernel stacks
+const KERNEL_STACK_SIZE: u64 = 32 * 1024;
+
+/// Padding deadspace to add between kernel stacks
+const KERNEL_STACK_PAD: u64 = 32 * 1024;
+
+/// The virtual base in the kernel page table where physical memory is linearly mapped. Such that
+/// a dereference of `KERNEK_PHYS_WINDOW_BASE` in the kernel address space, will be accessing `0`
+/// in physical memory.
+pub const KERNEL_PHYS_WINDOW_BASE: u64 = 0xffff_cafe_0000_0000;
+
 /// Structures to pass between both the 32-bit and 64-bit modes. This structure MUST be identical
 /// in both modes. Thus, no using pointers, references, or usizes. Also, make sure everything
 /// is marked #[repr(C)]., otherwirse the 32 and 64-bit variants may slightly be reordered as Rust
@@ -29,6 +40,8 @@ pub struct BootArgs {
 
     /// The page table used for the kernel
     pub page_table: LockCell<Option<PageTable>>,
+
+    pub trampoline_page_table: LockCell<Option<PageTable>>,
 
     /// Address of the kernel entry point
     pub kernel_entry: LockCell<Option<u64>>,

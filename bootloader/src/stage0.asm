@@ -58,6 +58,8 @@ protected_mode_entry:
     ; Set up a basic stack
     mov esp, 0x7c00
 
+    push dword bootloader_end
+
     ; jump into Rust
     call entry_point
 
@@ -97,3 +99,5 @@ ap_entry:
 times (0x8100 - 0x7c00)-($-$$) db 0
 incbin "build/sherlock.flat"
 
+; A marker for the end of the bootloader
+bootloader_end:
