@@ -9,7 +9,6 @@ extern crate core_reqs;
 mod panic;
 
 use boot_args::BootArgs;
-use serial::SerialPort;
 
 /// Release the early boot stack such that other cores can use it by marking it as available
 fn release_early_stack() {
@@ -27,7 +26,7 @@ pub extern fn entry(boot_args: &'static BootArgs) -> ! {
     // Initialize the corelocals
     core_locals::init(boot_args);
 
-    if cpu::is_bsp() { //core!().id == 0 {
+    if cpu::is_bsp() { 
         // One-time initialization for the whole kernel and all the cores
 
         // Bring up all other cores

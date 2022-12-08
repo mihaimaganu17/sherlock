@@ -72,7 +72,7 @@ impl PageTable{
     }
 
     /// Create a new page table from an existing CR3
-    pub fn from_cr3<P: PhysMem>(phys_mem: &mut P, cr3: u64) -> PageTable {
+    pub fn from_cr3(cr3: u64) -> PageTable {
         // Return out the page table with the VPID bits masked off(Intel Manual 4-24 Vol3A)
         PageTable {
             table: PhysAddr(cr3 & !0xfff),

@@ -93,15 +93,21 @@ pub extern fn entry() -> !{
             }
 
             // Load all the sections from the PE into the page table
-            pe.sections(|vaddr, vsize, raw, _, _, _| {
+            pe.sections(|vaddr, vsize, raw, read, write, execute| {
                 // Create a new virtual mapping for the PE range and initialize it to the raw bytes
                 // from the PE file, otherwise to zero for all the bytes that were not initialized in
                 // the file
                 unsafe {
-                    table.map_init(&mut pmem, VirtAddr(vaddr), PageSize::Page4K, vsize as u64, true, true, true, 
+                    table.map_init(&mut pmem, VirtAddr(vaddr), PageSize::Page4K, vsize as u64, 
+                        read, write, execute,
                         Some(|off| raw.get(off as usize).copied().unwrap_or(0)))?;
                 }
-                print!("Created map at {:x?} for {:x?}\n", vaddr as usize, vsize as usize);
+                print!("Created map at {:x?} for {:x?} bytes | permissions {}{}{}\n",
+                    vaddr as usize, vsize as usize,
+                    if read { "R" } else { "-" },
+                    if write { "W" } else { "-" },
+                    if execute { "X" } else { "-" },
+                );
                 Some(())
             }).unwrap();
 
